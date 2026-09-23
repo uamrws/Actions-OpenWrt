@@ -74,6 +74,19 @@ cp -f "$GITHUB_WORKSPACE/.config" .config
 [ -d "$GITHUB_WORKSPACE/files" ] && cp -r "$GITHUB_WORKSPACE/files" ./files
 "$GITHUB_WORKSPACE/diy-part2.sh"
 
+# ARM64 主机专用：OpenWrt 24.10 的 go1.4 C-bootstrap 不支持 linux/aarch64，
+# 按官方文档改用外部 Go 当 bootstrap（amd64 主机跳过此段）
+if [ "$(uname -m)" = "aarch64" ]; then
+  if [ ! -x /usr/local/go/bin/go ]; then
+    echo "  [aarch64] 安装外部 Go bootstrap (go1.23.12 linux-arm64) ..."
+    sudo wget -q https://dl.google.com/go/go1.23.12.linux-arm64.tar.gz -O /tmp/go-bootstrap.tar.gz
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf /tmp/go-bootstrap.tar.gz
+  fi
+  grep -q '^CONFIG_GOLANG_EXTERNAL_BOOTSTRAP_ROOT' .config || \
+    echo 'CONFIG_GOLANG_EXTERNAL_BOOTSTRAP_ROOT="/usr/local/go"' >> .config
+fi
+
 make defconfig
 make download -j8
 echo "  开始编译 ($NPROC 线程, 预计 1~3 小时) ..."
