@@ -90,7 +90,7 @@ fi
 make defconfig
 make download -j8
 echo "  开始编译 ($NPROC 线程, 预计 1~3 小时) ..."
-make -j"$NPROC" || make -j1 || make -j1 V=s
+make -j"$NPROC" || make -j1 V=s
 
 # ---------- 7. 完成 ----------
 echo "[7/7] 编译完成! 固件位置:"

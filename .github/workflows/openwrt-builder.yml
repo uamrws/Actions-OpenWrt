@@ -181,7 +181,7 @@ jobs:
         # 必须先 defconfig 规范化 .config，否则 make 会触发交互式 menuconfig 报错
         make defconfig
         echo -e "$(nproc) thread compile"
-        make -j$(nproc) || make -j1 || make -j1 V=s
+        make -j$(nproc) || make -j1 V=s
         # 只有编译成功才执行到下面；失败时 bash -e 使本步失败, status 为空
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
