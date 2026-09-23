@@ -1,13 +1,14 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-bulder.yml
-# Description: Build OpenWrt using GitHub Actions
+# File: .github/workflows/openwrt-builder.yml
+# Description: Build OpenWrt using GitHub Actions (3-stage pipeline)
 #
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
+# 分阶段流水线(对应 build-local.sh 的步骤):
+#   job download : 装依赖→克隆源码+feeds→应用配置→make download→缓存 dl/
+#   job compile  : needs download; 恢复 dl 缓存→make 编译→上传固件产物
+#   job publish  : needs compile; 取固件产物→发布到 Release
+# 任一 job 失败, 后续 job 全部跳过(needs 依赖)
 #
 
 name: OpenWrt Builder
@@ -32,10 +33,19 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
+  # 固件产物的固定 artifact 名(publish job 据此下载)
+  ARTIFACT_FW: OpenWrt_firmware
+  # dl/ 缓存 key：源码 tag + 影响下载内容的配置文件哈希，改动即失效
+  DL_CACHE_KEY: openwrt-dl-${{ env.REPO_BRANCH }}-${{ hashFiles('.config','diy-part1.sh','diy-part2.sh') }}
+
+# 三段共用的准备动作（装依赖+克隆+feeds+配置），放在辅助 action 的 include 文件里复用
+# 说明：GitHub 每个 job 是独立虚拟机，无法共享中间状态，故 download/compile 都要各自准备
 
 jobs:
-  build:
+  # ============ Stage 1: 准备 + 下载依赖 + 缓存 ============
+  download:
     runs-on: ubuntu-22.04
+    timeout-minutes: 120
 
     steps:
     - name: Checkout
@@ -62,7 +72,7 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Load custom feeds
+    - name: Load custom feeds (diy-part1)
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
@@ -75,7 +85,7 @@ jobs:
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: Load custom configuration
+    - name: Load custom configuration (diy-part2)
       run: |
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
@@ -83,14 +93,78 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
+    - name: Restore dl cache (若有缓存则复用, 跳过重复下载)
+      uses: actions/cache@v4
+      with:
+        path: /workdir/openwrt/dl
+        key: ${{ env.DL_CACHE_KEY }}
+
     - name: Download package
-      id: package
       run: |
         cd openwrt
         make defconfig
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
+      # job 结束时 actions/cache 自动把 dl/ 存回缓存
+
+  # ============ Stage 2: 编译 (依赖 download) ============
+  compile:
+    needs: download
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: Load custom feeds (diy-part1)
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: Update feeds
+      run: cd openwrt && ./scripts/feeds update -a
+
+    - name: Install feeds
+      run: cd openwrt && ./scripts/feeds install -a
+
+    - name: Load custom configuration (diy-part2)
+      run: |
+        [ -e files ] && mv files openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: Restore dl cache (复用 download job 下载好的依赖)
+      uses: actions/cache@v4
+      with:
+        path: /workdir/openwrt/dl
+        key: ${{ env.DL_CACHE_KEY }}
 
     - name: Compile the firmware
       id: compile
@@ -98,6 +172,7 @@ jobs:
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
+        # 只有编译成功才执行到下面；失败时 bash -e 使本步失败, status 为空
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -107,32 +182,41 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-    - name: Upload bin directory
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: openwrt/bin
-
     - name: Organize files
       id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true'
       run: |
         cd openwrt/bin/targets/*/*
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware directory
+    - name: Upload firmware artifact
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        name: ${{ env.ARTIFACT_FW }}
         path: ${{ env.FIRMWARE }}
+
+  # ============ Stage 3: 发布到 Release (依赖 compile) ============
+  publish:
+    needs: compile
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+
+    - name: Download firmware artifact
+      uses: actions/download-artifact@main
+      with:
+        name: ${{ env.ARTIFACT_FW }}
+        path: firmware
 
     - name: Generate release tag
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true'
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
@@ -140,23 +224,24 @@ jobs:
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+      if: steps.tag.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
+        files: firmware/*
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@main
+      if: env.UPLOAD_RELEASE == 'true'
       with:
         retain_days: 0
         keep_minimum_runs: 2
 
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@master
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true'
       with:
         keep_latest: 3
         delete_tags: true
