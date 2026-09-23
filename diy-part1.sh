@@ -10,9 +10,10 @@
 # See /LICENSE for more information.
 #
 
-# Uncomment a feed source
-#sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
-
-# Add a feed source
-echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
-#echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
+# ============ 第三方插件源（为兼容官方 OpenWrt 精挑的来源）============
+# 原则：官方源能提供的，一律走官方；官方没有的，才用口碑好的专门源。
+#   - AdGuard Home / 网络唤醒WOL / Watchcat / 动态DNS → 官方 luci + packages 源（feeds.conf.default 自带，无需加）
+#   - OpenClash → 上游官方仓库 vernesong/OpenClash（专为官方 OpenWrt 设计，最兼容）
+#   - ddns-go   → sirpdboy/luci-app-ddns-go（独立维护，含 ddns-go 本体 + LuCI 界面）
+echo 'src-git OpenClash https://github.com/vernesong/OpenClash.git' >> feeds.conf.default
+echo 'src-git ddns-go https://github.com/sirpdboy/luci-app-ddns-go.git' >> feeds.conf.default
