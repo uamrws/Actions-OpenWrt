@@ -16,4 +16,4 @@
 #   - OpenClash → 上游官方仓库 vernesong/OpenClash（专为官方 OpenWrt 设计，最兼容）
 #   - ddns-go   → sirpdboy/luci-app-ddns-go（独立维护，含 ddns-go 本体 + LuCI 界面）
 echo 'src-git OpenClash https://github.com/vernesong/OpenClash.git' >> feeds.conf.default
-echo 'src-git ddns-go https://github.com/sirpdboy/luci-app-ddns-go.git' >> feeds.conf.default
+echo 'src-git ddns_go https://github.com/sirpdboy/luci-app-ddns-go.git' >> feeds.conf.default
