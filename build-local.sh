@@ -23,13 +23,16 @@ echo " 工作目录: $WORKDIR    编译线程: $NPROC"
 echo "======================================================"
 
 # ---------- 1. 安装编译依赖 (Ubuntu 22.04, 已验证) ----------
-echo "[1/7] 安装编译依赖 ..."
+echo "[1/7] 安装编译依赖 (主机架构: $(uname -m)) ..."
+# 下面 3 个是 amd64 主机专用 multilib(i386 兼容), Apple Silicon 的 arm64 VM 没有也不需要
+M64=""
+if [ "$(uname -m)" = "x86_64" ]; then M64="gcc-multilib g++-multilib libc6-dev-i386"; fi
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git file \
+  build-essential clang flex bison g++ gawk gettext git file $M64 \
   libncurses-dev libssl-dev python3-distutils python3-setuptools rsync swig unzip zlib1g-dev \
   ack antlr3 asciidoc autoconf automake autopoint binutils bzip2 ccache cmake cpio curl \
-  device-tree-compiler fastjar gperf haveged help2man intltool libc6-dev-i386 libelf-dev \
+  device-tree-compiler fastjar gperf haveged help2man intltool libelf-dev \
   libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libpython3-dev \
   libreadline-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkg-config \
   python3 python3-pyelftools qemu-utils scons squashfs-tools subversion texinfo uglifyjs \
