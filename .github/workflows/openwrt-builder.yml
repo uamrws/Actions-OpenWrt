@@ -35,8 +35,8 @@ env:
   TZ: Asia/Shanghai
   # 固件产物的固定 artifact 名(publish job 据此下载)
   ARTIFACT_FW: OpenWrt_firmware
-  # dl/ 缓存 key：源码 tag + 影响下载内容的配置文件哈希，改动即失效
-  DL_CACHE_KEY: openwrt-dl-${{ env.REPO_BRANCH }}-${{ hashFiles('.config','diy-part1.sh','diy-part2.sh') }}
+  # 注意: 不能在顶层 env 内引用 env.REPO_BRANCH(GitHub 会报 Unrecognized named-value)
+  # dl/ 缓存 key 改在每个 job 内用单独 step 计算(见各 job 的 "Compute dl cache key")
 
 # 三段共用的准备动作（装依赖+克隆+feeds+配置），放在辅助 action 的 include 文件里复用
 # 说明：GitHub 每个 job 是独立虚拟机，无法共享中间状态，故 download/compile 都要各自准备
@@ -93,11 +93,15 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
+    - name: Compute dl cache key
+      id: dkey
+      run: echo "key=openwrt-dl-${{ env.REPO_BRANCH }}-${{ hashFiles('.config','diy-part1.sh','diy-part2.sh') }}" >> "$GITHUB_OUTPUT"
+
     - name: Restore dl cache (若有缓存则复用, 跳过重复下载)
       uses: actions/cache@v4
       with:
         path: /workdir/openwrt/dl
-        key: ${{ env.DL_CACHE_KEY }}
+        key: ${{ steps.dkey.outputs.key }}
 
     - name: Download package
       run: |
@@ -160,11 +164,15 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
+    - name: Compute dl cache key
+      id: dkey
+      run: echo "key=openwrt-dl-${{ env.REPO_BRANCH }}-${{ hashFiles('.config','diy-part1.sh','diy-part2.sh') }}" >> "$GITHUB_OUTPUT"
+
     - name: Restore dl cache (复用 download job 下载好的依赖)
       uses: actions/cache@v4
       with:
         path: /workdir/openwrt/dl
-        key: ${{ env.DL_CACHE_KEY }}
+        key: ${{ steps.dkey.outputs.key }}
 
     - name: Compile the firmware
       id: compile
