@@ -35,6 +35,10 @@ echo 'net.netfilter.nf_conntrack_udp_timeout=60' >> package/base-files/files/etc
 mkdir -p package/custom
 cp -r "$GITHUB_WORKSPACE/custom/vlmcsd" package/custom/
 cp -r "$GITHUB_WORKSPACE/custom/luci-app-vlmcsd" package/custom/
+# 覆盖 feed 的 ddns-go：sirpdboy 最新版(6.13+)的 go.mod 要 Go>=1.25，OpenWrt 24.10 只带 Go 1.23.12
+# 钉到 v6.12.5（go.mod 要求 go 1.23.12，完全匹配）；luci-app-ddns-go UI 仍用 feed 最新版
+rm -rf package/feeds/ddns_go/ddns-go
+cp -r "$GITHUB_WORKSPACE/custom/ddns-go" package/custom/ddns-go
 
 # ============ 把插件写进 .config（make defconfig 会自动补全依赖）============
 cat >> .config << 'EOF'
