@@ -16,6 +16,11 @@ on:
   repository_dispatch:
   workflow_dispatch:
 
+# 防并发：同一分支同时只跑一个 build，重复触发时取消旧 run
+concurrency:
+  group: openwrt-build-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REPO_URL: https://github.com/openwrt/openwrt
   REPO_BRANCH: v24.10.8
@@ -131,7 +136,6 @@ jobs:
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
-        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to release
