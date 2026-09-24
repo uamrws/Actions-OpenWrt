@@ -50,8 +50,9 @@ cat >> .config << 'EOF'
 CONFIG_PACKAGE_luci=y
 # OpenClash · 代理分流（自动带 dnsmasq-full / kmod-tun / bash / curl / ruby 等）
 CONFIG_PACKAGE_luci-app-openclash=y
-# AdGuard Home · DNS 去广告（自动带 adguardhome 本体）
-CONFIG_PACKAGE_luci-app-adguardhome=y
+# AdGuard Home · DNS 去广告（官方二进制本体，自带网页管理界面 :3000；
+# 注意：官方源没有 luci-app-adguardhome 图形插件，只有 adguardhome 本体）
+CONFIG_PACKAGE_adguardhome=y
 # 动态DNS（ddns-go，自动带 ddns-go 本体）
 CONFIG_PACKAGE_luci-app-ddns-go=y
 # Watchcat · 断线检测重启（自动带 watchcat）
@@ -91,6 +92,17 @@ CONFIG_PACKAGE_luci-app-nlbwmon=y
 CONFIG_PACKAGE_kmod-nft-tproxy=y
 # 系统/网络监控图表（自动带 collectd+rrdtool）
 CONFIG_PACKAGE_luci-app-statistics=y
+
+# ===== 中文语言包（luci 默认只带英文，需显式勾选 zh-cn）=====
+CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-firewall-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-sqm-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-nlbwmon-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-statistics-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-watchcat-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-wol-zh-cn=y
+# 注意：adguardhome 二进制自带英文网页界面，官方无 i18n 包
+# OpenClash / ddns-go / vlmcsd 为第三方源，界面本身就是中文，无独立 i18n 包
 
 # ===== 无 WiFi 网卡，关闭无线组件 =====
 CONFIG_PACKAGE_wpad-basic-mbedtls=n
