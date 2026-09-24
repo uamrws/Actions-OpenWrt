@@ -13,10 +13,13 @@
 # ============ 自定义配置（可按需改）============
 
 # 修改默认管理 IP / 网关（把 192.168.1.1 改成你想要的网段）
-sed -i 's/192.168.1.1/192.168.50.5/g' package/base-files/files/bin/config_generate
+sed -i 's/192.168.1.1/10.10.1.1/g' package/base-files/files/bin/config_generate
 
-# 修改默认主机名
-sed -i "s/hostname='OpenWrt'/hostname='MyRouter'/" package/base-files/files/bin/config_generate
+# LAN 子网掩码改为 /22（255.255.252.0）
+sed -i 's/255.255.255.0/255.255.252.0/g' package/base-files/files/bin/config_generate
+
+# 主机名：保持默认 OpenWrt（如需修改，取消下行注释并按需改名）
+# sed -i "s/hostname='OpenWrt'/hostname='MyRouter'/" package/base-files/files/bin/config_generate
 
 # （可选）更换默认主题：官方源自带 luci-theme-openwrt-2020；argon 需额外装包，勿直接替换
 # sed -i 's/luci-theme-bootstrap/luci-theme-openwrt-2020/g' feeds/luci/collections/luci/Makefile
